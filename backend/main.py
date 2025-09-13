@@ -103,4 +103,5 @@ async def refresh_legislation_data():
         raise HTTPException(status_code=500, detail=f"데이터 새로고침 중 오류가 발생했습니다: {str(e)}")
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    port = int(os.getenv("PORT", 7050))
+    uvicorn.run(app, host="0.0.0.0", port=port)
