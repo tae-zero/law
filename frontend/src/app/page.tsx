@@ -15,7 +15,8 @@ import {
   Filter,
   Search,
   Download,
-  Settings
+  Settings,
+  Info
 } from 'lucide-react';
 import { legislationApi } from '@/lib/api';
 import { LegislationItem, LegislationResponse } from '@/types/legislation';
@@ -23,6 +24,7 @@ import LegislationCard from '@/components/LegislationCard';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import ErrorMessage from '@/components/ErrorMessage';
 import ThemeToggle from '@/components/ThemeToggle';
+import ProjectInfoModal from '@/components/ProjectInfoModal';
 
 export default function Home() {
   const [legislationData, setLegislationData] = useState<LegislationItem[]>([]);
@@ -31,6 +33,7 @@ export default function Home() {
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState<'all' | 'national' | 'admin'>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [showProjectInfo, setShowProjectInfo] = useState(false);
 
   const fetchData = async (type: 'all' | 'national' | 'admin' = 'all') => {
     try {
@@ -132,6 +135,16 @@ export default function Home() {
                   className="input pl-10 pr-4 py-2 w-64"
                 />
               </div>
+              
+              {/* 프로젝트 정보 버튼 */}
+              <button
+                onClick={() => setShowProjectInfo(true)}
+                className="btn-secondary flex items-center space-x-2"
+                title="프로젝트 정보"
+              >
+                <Info className="h-4 w-4" />
+                <span className="hidden sm:inline">프로젝트 정보</span>
+              </button>
               
               {/* 테마 토글 */}
               <ThemeToggle />
@@ -330,6 +343,12 @@ export default function Home() {
           )}
         </div>
       </main>
+
+      {/* 프로젝트 정보 모달 */}
+      <ProjectInfoModal 
+        isOpen={showProjectInfo} 
+        onClose={() => setShowProjectInfo(false)} 
+      />
     </div>
   );
 }
