@@ -16,9 +16,9 @@ else:
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
-class LegislationDB(Base):
-    """입법예고 데이터베이스 모델"""
-    __tablename__ = "legislation"
+class NationalLegislationDB(Base):
+    """입법부 입법예고 데이터베이스 모델"""
+    __tablename__ = "national_legislations"
     
     id = Column(Integer, primary_key=True, index=True)
     bill_no = Column(String(50), index=True, nullable=True)  # 의안번호
@@ -29,16 +29,39 @@ class LegislationDB(Base):
     end_date = Column(String(20), nullable=False)  # 게시종료일
     content = Column(Text, nullable=True)  # 주요내용
     link_url = Column(String(500), nullable=False)  # 링크 URL
-    source = Column(String(20), nullable=False, index=True)  # 출처 (national/admin)
     created_at = Column(DateTime, default=datetime.utcnow)  # 수집일시
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)  # 수정일시
     is_active = Column(Boolean, default=True)  # 활성 상태
     
     # 인덱스 설정
     __table_args__ = (
-        Index('idx_source_date', 'source', 'start_date'),
-        Index('idx_end_date', 'end_date'),
-        Index('idx_committee', 'committee'),
+        Index('idx_national_date', 'start_date'),
+        Index('idx_national_end_date', 'end_date'),
+        Index('idx_national_committee', 'committee'),
+    )
+
+class AdminLegislationDB(Base):
+    """행정부 입법예고 데이터베이스 모델"""
+    __tablename__ = "admin_legislations"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    bill_no = Column(String(50), index=True, nullable=True)  # 의안번호
+    title = Column(String(500), nullable=False)  # 제목
+    committee = Column(String(200), nullable=False)  # 소관위원회
+    proposer = Column(String(200), nullable=True)  # 제안자
+    start_date = Column(String(20), nullable=False)  # 게시시작일
+    end_date = Column(String(20), nullable=False)  # 게시종료일
+    content = Column(Text, nullable=True)  # 주요내용
+    link_url = Column(String(500), nullable=False)  # 링크 URL
+    created_at = Column(DateTime, default=datetime.utcnow)  # 수집일시
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)  # 수정일시
+    is_active = Column(Boolean, default=True)  # 활성 상태
+    
+    # 인덱스 설정
+    __table_args__ = (
+        Index('idx_admin_date', 'start_date'),
+        Index('idx_admin_end_date', 'end_date'),
+        Index('idx_admin_committee', 'committee'),
     )
 
 def get_db():

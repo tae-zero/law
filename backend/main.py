@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 from services.legislation_service import LegislationService
 from services.database_service import DatabaseService
 from models.legislation_models import LegislationResponse, LegislationItem
+from models.database import create_tables
 
 # 환경변수 로드
 load_dotenv()
@@ -42,6 +43,14 @@ app.add_middleware(
 
 # 서비스 인스턴스
 legislation_service = LegislationService()
+
+# 데이터베이스 테이블 생성
+try:
+    logger.info("🏗️ 데이터베이스 테이블 생성 중...")
+    create_tables()
+    logger.info("✅ 데이터베이스 테이블 생성 완료")
+except Exception as e:
+    logger.error(f"❌ 데이터베이스 테이블 생성 실패: {str(e)}")
 
 # 데이터베이스 서비스 초기화 및 연결 테스트
 try:
@@ -80,8 +89,9 @@ async def test_database():
     
     try:
         # 데이터베이스 연결 테스트
-        test_result = database_service.get_legislation_data(limit=1)
-        data_count = len(test_result) if test_result else 0
+        national_count = len(database_service.get_national_legislation_data(limit=1))
+        admin_count = len(database_service.get_admin_legislation_data(limit=1))
+        data_count = national_count + admin_count
         
         logger.info(f"✅ 데이터베이스 연결 테스트 성공 - 데이터: {data_count}건")
         
@@ -89,6 +99,8 @@ async def test_database():
             "status": "success", 
             "message": "데이터베이스 연결 성공",
             "data_count": data_count,
+            "national_count": national_count,
+            "admin_count": admin_count,
             "database_url": os.getenv('DATABASE_URL', 'NOT_SET')[:50] + "..."
         }
     except Exception as e:
@@ -111,19 +123,24 @@ async def get_national_legislation():
         
         # 데이터베이스에서 조회
         logger.info("📊 데이터베이스에서 입법부 데이터 조회 중...")
-        data = database_service.get_legislation_data(source="national")
+        data = database_service.get_national_legislation_data()
         
         if not data:
             logger.warning("⚠️ 데이터베이스에 입법부 데이터가 없음 - 실시간 크롤링 시작")
-            # 데이터가 없으면 실시간 크롤링 (백업)
-            data = await legislation_service.get_national_legislation()
-            if data:
-                logger.info(f"💾 크롤링한 입법부 데이터 {len(data)}건을 데이터베이스에 저장 중...")
-                # 크롤링한 데이터를 데이터베이스에 저장
-                database_service.save_legislation_data(data)
-                logger.info("✅ 데이터베이스 저장 완료")
-            else:
-                logger.error("❌ 입법부 데이터 크롤링 실패")
+            try:
+                # 데이터가 없으면 실시간 크롤링 (백업)
+                data = await legislation_service.get_national_legislation()
+                if data:
+                    logger.info(f"💾 크롤링한 입법부 데이터 {len(data)}건을 데이터베이스에 저장 중...")
+                    # 크롤링한 데이터를 데이터베이스에 저장
+                    database_service.save_national_legislation_data(data)
+                    logger.info("✅ 데이터베이스 저장 완료")
+                else:
+                    logger.error("❌ 입법부 데이터 크롤링 실패 - 데이터 없음")
+                    data = []
+            except Exception as crawl_error:
+                logger.error(f"❌ 입법부 데이터 크롤링 오류: {str(crawl_error)}")
+                data = []
         else:
             logger.info(f"✅ 데이터베이스에서 입법부 데이터 {len(data)}건 조회 성공")
         
@@ -149,7 +166,7 @@ async def get_admin_legislation():
         
         # 데이터베이스에서 조회
         logger.info("📊 데이터베이스에서 행정부 데이터 조회 중...")
-        data = database_service.get_legislation_data(source="admin")
+        data = database_service.get_admin_legislation_data()
         
         if not data:
             logger.warning("⚠️ 데이터베이스에 행정부 데이터가 없음 - 실시간 크롤링 시작")
@@ -158,7 +175,7 @@ async def get_admin_legislation():
             if data:
                 logger.info(f"💾 크롤링한 행정부 데이터 {len(data)}건을 데이터베이스에 저장 중...")
                 # 크롤링한 데이터를 데이터베이스에 저장
-                database_service.save_legislation_data(data)
+                database_service.save_admin_legislation_data(data)
                 logger.info("✅ 데이터베이스 저장 완료")
             else:
                 logger.error("❌ 행정부 데이터 크롤링 실패")
@@ -187,8 +204,8 @@ async def get_all_legislation():
         
         # 데이터베이스에서 조회
         logger.info("📊 데이터베이스에서 모든 데이터 조회 중...")
-        national_data = database_service.get_legislation_data(source="national")
-        admin_data = database_service.get_legislation_data(source="admin")
+        national_data = database_service.get_national_legislation_data()
+        admin_data = database_service.get_admin_legislation_data()
         
         logger.info(f"📊 조회 결과 - 입법부: {len(national_data) if national_data else 0}건, 행정부: {len(admin_data) if admin_data else 0}건")
         
@@ -198,7 +215,7 @@ async def get_all_legislation():
             national_data = await legislation_service.get_national_legislation()
             if national_data:
                 logger.info(f"💾 크롤링한 입법부 데이터 {len(national_data)}건을 데이터베이스에 저장 중...")
-                database_service.save_legislation_data(national_data)
+                database_service.save_national_legislation_data(national_data)
                 logger.info("✅ 입법부 데이터 저장 완료")
             else:
                 logger.error("❌ 입법부 데이터 크롤링 실패")
@@ -209,7 +226,7 @@ async def get_all_legislation():
             admin_data = await legislation_service.get_admin_legislation()
             if admin_data:
                 logger.info(f"💾 크롤링한 행정부 데이터 {len(admin_data)}건을 데이터베이스에 저장 중...")
-                database_service.save_legislation_data(admin_data)
+                database_service.save_admin_legislation_data(admin_data)
                 logger.info("✅ 행정부 데이터 저장 완료")
             else:
                 logger.error("❌ 행정부 데이터 크롤링 실패")
@@ -240,8 +257,8 @@ async def refresh_legislation_data():
         
         # 기존 데이터 삭제 후 새로 수집
         logger.info("🗑️ 기존 데이터 삭제 중...")
-        deleted_national = database_service.delete_legislation_by_source("national")
-        deleted_admin = database_service.delete_legislation_by_source("admin")
+        deleted_national = database_service.delete_national_legislation_data()
+        deleted_admin = database_service.delete_admin_legislation_data()
         logger.info(f"🗑️ 삭제 완료 - 입법부: {deleted_national}건, 행정부: {deleted_admin}건")
         
         # 새로운 데이터 수집
@@ -252,12 +269,12 @@ async def refresh_legislation_data():
         # 데이터베이스에 저장
         if national_data:
             logger.info(f"💾 입법부 데이터 {len(national_data)}건 저장 중...")
-            database_service.save_legislation_data(national_data)
+            database_service.save_national_legislation_data(national_data)
             logger.info("✅ 입법부 데이터 저장 완료")
         
         if admin_data:
             logger.info(f"💾 행정부 데이터 {len(admin_data)}건 저장 중...")
-            database_service.save_legislation_data(admin_data)
+            database_service.save_admin_legislation_data(admin_data)
             logger.info("✅ 행정부 데이터 저장 완료")
         
         total_count = len(national_data) + len(admin_data)
