@@ -113,7 +113,7 @@ class WebScraper:
             return []
     
     def _scrape_national_detail_page(self, url: str, target_date: str) -> Optional[Dict]:
-        """입법부 상세 페이지에서 데이터 추출 - 간소화된 버전"""
+        """입법부 상세 페이지에서 데이터 추출 - 정확한 파싱"""
         try:
             response = self.session.get(url, timeout=30)
             response.raise_for_status()
@@ -132,45 +132,53 @@ class WebScraper:
             # 페이지 텍스트 전체에서 정보 추출
             page_text = soup.get_text()
             
-            # 제목 추출 - 가장 간단한 방법
-            title_elem = soup.select_one('h1, h2, h3, .title, .board-title')
+            # 제목 추출 - 더 정확한 방법
+            title_elem = soup.select_one('h1, h2, h3, .title, .board-title, .legislation-heading h3')
             if title_elem:
                 title = title_elem.get_text(strip=True)
+                # 제목에서 불필요한 부분 제거
+                if "]" in title and "(" in title:
+                    title = title.split("]")[-1].split("(")[0].strip()
             
-            # 테이블에서 정보 추출
-            tables = soup.select('table')
-            for table in tables:
-                rows = table.select('tr')
-                for row in rows:
-                    cells = row.select('td, th')
-                    if len(cells) >= 2:
-                        label = cells[0].get_text(strip=True)
-                        value = cells[1].get_text(strip=True)
-                        
-                        # 의안번호
-                        if "의안번호" in label or "안건번호" in label:
-                            bill_no = value
-                        # 제안자
-                        elif "제안자" in label or "발의자" in label:
-                            proposer = value
-                        # 소관위
-                        elif "소관위" in label or "위원회" in label:
-                            committee = value
-                        # 게시기간
-                        elif "게시" in label and "기간" in label:
-                            if "~" in value:
-                                dates = value.split("~")
-                                noti_st_dt = dates[0].strip()
-                                noti_ed_dt = dates[1].strip()
-                            else:
-                                noti_st_dt = value.strip()
-                                noti_ed_dt = value.strip()
+            # 정규식으로 정보 추출
+            import re
             
-            # 내용 추출 - div에서 찾기
+            # 의안번호 추출
+            bill_match = re.search(r'의안번호[:\s]*(\d+)', page_text)
+            if bill_match:
+                bill_no = bill_match.group(1)
+            
+            # 제안자 추출 - 더 정확한 패턴
+            proposer_match = re.search(r'제안자[:\s]*([^\n\r]+)', page_text)
+            if not proposer_match:
+                proposer_match = re.search(r'발의자[:\s]*([^\n\r]+)', page_text)
+            if proposer_match:
+                proposer = proposer_match.group(1).strip()
+            
+            # 소관위 추출
+            committee_match = re.search(r'소관위원회[:\s]*([^\n\r]+)', page_text)
+            if not committee_match:
+                committee_match = re.search(r'소관위[:\s]*([^\n\r]+)', page_text)
+            if committee_match:
+                committee = committee_match.group(1).strip()
+            
+            # 게시기간 추출
+            period_match = re.search(r'입법\s*예고기간[:\s]*(\d{4}-\d{2}-\d{2})\s*~\s*(\d{4}-\d{2}-\d{2})', page_text)
+            if period_match:
+                noti_st_dt = period_match.group(1)
+                noti_ed_dt = period_match.group(2)
+            else:
+                # 대안 패턴
+                period_match = re.search(r'게시기간[:\s]*(\d{4}-\d{2}-\d{2})\s*~\s*(\d{4}-\d{2}-\d{2})', page_text)
+                if period_match:
+                    noti_st_dt = period_match.group(1)
+                    noti_ed_dt = period_match.group(2)
+            
+            # 내용 추출 - 더 정확한 방법
             content_divs = soup.select('div')
             for div in content_divs:
                 div_text = div.get_text(strip=True)
-                if len(div_text) > 50 and any(keyword in div_text for keyword in ["내용", "요약", "개요"]):
+                if len(div_text) > 100 and any(keyword in div_text for keyword in ["법률안", "입법예고", "내용"]):
                     content = div_text
                     break
             
