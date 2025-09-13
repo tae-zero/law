@@ -58,8 +58,10 @@ try:
     logger.info("✅ 데이터베이스 서비스 초기화 성공")
     
     # 데이터베이스 연결 테스트
-    test_result = database_service.get_legislation_data(limit=1)
-    logger.info(f"✅ 데이터베이스 연결 테스트 성공 - 기존 데이터: {len(test_result) if test_result else 0}건")
+    national_count = len(database_service.get_national_legislation_data(limit=1))
+    admin_count = len(database_service.get_admin_legislation_data(limit=1))
+    total_count = national_count + admin_count
+    logger.info(f"✅ 데이터베이스 연결 테스트 성공 - 기존 데이터: {total_count}건 (입법부: {national_count}, 행정부: {admin_count})")
     
 except Exception as e:
     logger.error(f"❌ 데이터베이스 연결 실패: {str(e)}")
