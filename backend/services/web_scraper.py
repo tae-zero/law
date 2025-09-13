@@ -113,71 +113,70 @@ class WebScraper:
             return []
     
     def _scrape_national_detail_page(self, url: str, target_date: str) -> Optional[Dict]:
-        """입법부 상세 페이지에서 데이터 추출"""
+        """입법부 상세 페이지에서 데이터 추출 - 간소화된 버전"""
         try:
             response = self.session.get(url, timeout=30)
             response.raise_for_status()
             
             soup = BeautifulSoup(response.content, 'html.parser')
             
-            # 의안번호 추출 - CSS 선택자 사용
-            bill_no_elem = soup.select_one('table tbody tr td:first-child')
-            if not bill_no_elem:
-                # 대안 선택자
-                bill_no_elem = soup.select_one('.board01 table tbody tr td:first-child')
-            bill_no = bill_no_elem.get_text(strip=True) if bill_no_elem else "(없음)"
+            # 기본값 설정
+            bill_no = "(없음)"
+            title = "(제목 없음)"
+            proposer = "(제안자 없음)"
+            committee = "(소관위 없음)"
+            content = "(내용 없음)"
+            noti_st_dt = target_date
+            noti_ed_dt = target_date
             
-            # 제목 추출 - 더 일반적인 선택자 사용
-            title_elem = soup.select_one('h3, .legislation-heading h3, .board-title h3')
-            if not title_elem:
-                title_elem = soup.select_one('h1, h2, .title')
+            # 페이지 텍스트 전체에서 정보 추출
+            page_text = soup.get_text()
+            
+            # 제목 추출 - 가장 간단한 방법
+            title_elem = soup.select_one('h1, h2, h3, .title, .board-title')
             if title_elem:
-                raw_title = title_elem.get_text(strip=True)
-                if "]" in raw_title and "(" in raw_title:
-                    title = raw_title.split("]")[-1].split("(")[0].strip()
-                else:
-                    title = raw_title
-            else:
-                title = "(제목 없음)"
+                title = title_elem.get_text(strip=True)
             
-            # 제안자 추출 - 테이블에서 찾기
-            proposer_elem = soup.select_one('table tbody tr td:nth-child(2), .board01 table tbody tr td:nth-child(2)')
-            if not proposer_elem:
-                proposer_elem = soup.select_one('table tr td:contains("제안자"), table tr td:contains("발의자")')
-            proposer = proposer_elem.get_text(strip=True) if proposer_elem else "(제안자 없음)"
+            # 테이블에서 정보 추출
+            tables = soup.select('table')
+            for table in tables:
+                rows = table.select('tr')
+                for row in rows:
+                    cells = row.select('td, th')
+                    if len(cells) >= 2:
+                        label = cells[0].get_text(strip=True)
+                        value = cells[1].get_text(strip=True)
+                        
+                        # 의안번호
+                        if "의안번호" in label or "안건번호" in label:
+                            bill_no = value
+                        # 제안자
+                        elif "제안자" in label or "발의자" in label:
+                            proposer = value
+                        # 소관위
+                        elif "소관위" in label or "위원회" in label:
+                            committee = value
+                        # 게시기간
+                        elif "게시" in label and "기간" in label:
+                            if "~" in value:
+                                dates = value.split("~")
+                                noti_st_dt = dates[0].strip()
+                                noti_ed_dt = dates[1].strip()
+                            else:
+                                noti_st_dt = value.strip()
+                                noti_ed_dt = value.strip()
             
-            # 소관위 추출
-            committee_elem = soup.select_one('table tbody tr td.td_block, .board01 table tbody tr td.td_block')
-            if not committee_elem:
-                committee_elem = soup.select_one('table tr td:contains("소관위"), table tr td:contains("위원회")')
-            committee = committee_elem.get_text(strip=True) if committee_elem else "(소관위 없음)"
+            # 내용 추출 - div에서 찾기
+            content_divs = soup.select('div')
+            for div in content_divs:
+                div_text = div.get_text(strip=True)
+                if len(div_text) > 50 and any(keyword in div_text for keyword in ["내용", "요약", "개요"]):
+                    content = div_text
+                    break
             
-            # 게시기간 추출
-            period_elem = soup.select_one('table tbody tr td:nth-child(6), .board01 table tbody tr td:nth-child(6)')
-            if not period_elem:
-                period_elem = soup.select_one('table tr td:contains("~"), table tr td:contains("게시")')
-            if period_elem:
-                period_text = period_elem.get_text(strip=True)
-                if "~" in period_text:
-                    noti_range = period_text.split("~")
-                    noti_st_dt = noti_range[0].strip() if len(noti_range) >= 1 else ""
-                    noti_ed_dt = noti_range[1].strip() if len(noti_range) >= 2 else ""
-                else:
-                    noti_st_dt = period_text.strip()
-                    noti_ed_dt = period_text.strip()
-                
-                # 대상 날짜와 일치하지 않으면 None 반환
-                if noti_st_dt != target_date:
-                    return None
-            else:
-                noti_st_dt = target_date
-                noti_ed_dt = target_date
-            
-            # 내용 추출 - 더 일반적인 선택자
-            content_elem = soup.select_one('.card-wrap div, .content div, .board-content div')
-            if not content_elem:
-                content_elem = soup.select_one('div:contains("내용"), div:contains("요약")')
-            content = content_elem.get_text(strip=True) if content_elem else "(내용 없음)"
+            # 대상 날짜와 일치하지 않으면 None 반환
+            if noti_st_dt != target_date:
+                return None
             
             return {
                 "의안번호": bill_no,
