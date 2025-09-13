@@ -197,6 +197,22 @@ class DatabaseService:
             logger.error(f"통계 조회 오류: {e}")
             return {"total": 0, "national": 0, "admin": 0}
     
+    def delete_legislation_by_source(self, source: str) -> int:
+        """특정 출처의 모든 데이터 삭제"""
+        try:
+            deleted_count = self.db.query(LegislationDB).filter(
+                LegislationDB.source == source
+            ).delete()
+            
+            self.db.commit()
+            logger.info(f"{source} 데이터 {deleted_count}건 삭제 완료")
+            return deleted_count
+            
+        except Exception as e:
+            self.db.rollback()
+            logger.error(f"{source} 데이터 삭제 오류: {e}")
+            return 0
+    
     def cleanup_old_data(self, days: int = 30):
         """오래된 데이터 정리 (N일 이전 데이터 비활성화)"""
         try:

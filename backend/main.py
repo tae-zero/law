@@ -7,6 +7,7 @@ import os
 from dotenv import load_dotenv
 
 from services.legislation_service import LegislationService
+ 구구from services.database_service import DatabaseService
 from models.legislation_models import LegislationResponse, LegislationItem
 
 # 환경변수 로드
@@ -33,6 +34,7 @@ app.add_middleware(
 
 # 서비스 인스턴스
 legislation_service = LegislationService()
+database_service = DatabaseService()
 
 @app.get("/")
 async def root():
@@ -46,7 +48,16 @@ async def health_check():
 async def get_national_legislation():
     """입법부 입법예고 데이터를 가져옵니다."""
     try:
-        data = await legislation_service.get_national_legislation()
+        # 데이터베이스에서 조회
+        data = database_service.get_legislation_by_source("national")
+        
+        if not data:
+            # 데이터가 없으면 실시간 크롤링 (백업)
+            data = await legislation_service.get_national_legislation()
+            if data:
+                # 크롤링한 데이터를 데이터베이스에 저장
+                database_service.save_legislation_data(data)
+        
         return LegislationResponse(
             success=True,
             message="입법부 입법예고 데이터를 성공적으로 가져왔습니다.",
@@ -60,7 +71,16 @@ async def get_national_legislation():
 async def get_admin_legislation():
     """행정부 입법예고 데이터를 가져옵니다."""
     try:
-        data = await legislation_service.get_admin_legislation()
+        # 데이터베이스에서 조회
+        data = database_service.get_legislation_by_source("admin")
+        
+        if not data:
+            # 데이터가 없으면 실시간 크롤링 (백업)
+            data = await legislation_service.get_admin_legislation()
+            if data:
+                # 크롤링한 데이터를 데이터베이스에 저장
+                database_service.save_legislation_data(data)
+        
         return LegislationResponse(
             success=True,
             message="행정부 입법예고 데이터를 성공적으로 가져왔습니다.",
@@ -74,8 +94,20 @@ async def get_admin_legislation():
 async def get_all_legislation():
     """모든 입법예고 데이터를 가져옵니다."""
     try:
-        national_data = await legislation_service.get_national_legislation()
-        admin_data = await legislation_service.get_admin_legislation()
+        # 데이터베이스에서 조회
+        national_data = database_service.get_legislation_by_source("national")
+        admin_data = database_service.get_legislation_by_source("admin")
+        
+        # 데이터가 없으면 실시간 크롤링 (백업)
+        if not national_data:
+            national_data = await legislation_service.get_national_legislation()
+            if national_data:
+                database_service.save_legislation_data(national_data)
+        
+        if not admin_data:
+            admin_data = await legislation_service.get_admin_legislation()
+            if admin_data:
+                database_service.save_legislation_data(admin_data)
         
         all_data = national_data + admin_data
         
