@@ -33,7 +33,7 @@ export default function Home() {
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState<'all' | 'national' | 'admin'>('all');
   const [searchQuery, setSearchQuery] = useState('');
-  const [showProjectInfo, setShowProjectInfo] = useState(false);
+  const [showProjectInfo, setShowProjectInfo] = useState(true);
 
   const fetchData = async (type: 'all' | 'national' | 'admin' = 'all') => {
     try {
