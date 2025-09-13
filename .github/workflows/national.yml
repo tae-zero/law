@@ -1,0 +1,36 @@
+name: Run upload_legislation_national.py daily
+
+on:
+  schedule:
+    - cron: '0 1 * * *'  # 매일 오전 10:00 KST (UTC 기준 01:00)
+  workflow_dispatch:
+
+jobs:
+  run-script:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Decode base64 secret and create service_account.json
+        run: |
+          echo "${{ secrets.GOOGLE_API_KEY }}" | base64 -d > service_account.json
+
+      - name: Run scheduled crawler for national data
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          ASSEMBLY_API_KEY: ${{ secrets.ASSEMBLY_API_KEY }}
+          API_URL: ${{ secrets.API_URL }}
+        run: python scheduled_crawler.py national
+
