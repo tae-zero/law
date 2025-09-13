@@ -21,9 +21,13 @@ app = FastAPI(
 # CORS 설정
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # 프로덕션에서는 특정 도메인으로 제한
+    allow_origins=[
+        "*",  # 모든 도메인 허용
+        "https://*.vercel.app",  # 모든 Vercel 도메인
+        "https://*.railway.app",  # 모든 Railway 도메인
+    ],
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
 
