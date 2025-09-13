@@ -32,4 +32,4 @@ COPY . .
 EXPOSE 7050
 
 # 애플리케이션 실행
-CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT:-7050}"]
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "7050"]
