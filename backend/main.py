@@ -7,7 +7,7 @@ import os
 from dotenv import load_dotenv
 
 from services.legislation_service import LegislationService
- 구구from services.database_service import DatabaseService
+from services.database_service import DatabaseService
 from models.legislation_models import LegislationResponse, LegislationItem
 
 # 환경변수 로드
